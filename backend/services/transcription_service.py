@@ -66,6 +66,40 @@ class TranscriptionService:
         except Exception as e:
             raise Exception(f"Failed to start transcription: {str(e)}")
     
+    async def get_subtitle_export(self, job_id: str, format_type: str) -> str:
+        """Get subtitle export in specified format using AssemblyAI's export functionality"""
+        if job_id not in self.jobs:
+            raise Exception("Job not found")
+
+        job_info = self.jobs[job_id]
+        transcript = job_info["transcript"]
+
+        try:
+            loop = asyncio.get_event_loop()
+
+            if format_type.lower() == 'srt':
+                subtitle_content = await loop.run_in_executor(
+                    self.executor,
+                    lambda: transcript.export_subtitles_srt()
+                )
+            elif format_type.lower() == 'vtt':
+                subtitle_content = await loop.run_in_executor(
+                    self.executor,
+                    lambda: transcript.export_subtitles_vtt()
+                )
+            else:
+                # For TXT, get the full transcript text
+                current_transcript = await loop.run_in_executor(
+                    self.executor,
+                    lambda: aai.Transcript.get_by_id(transcript.id)
+                )
+                subtitle_content = current_transcript.text or ""
+
+            return subtitle_content
+
+        except Exception as e:
+            raise Exception(f"Error exporting subtitles: {str(e)}")
+
     async def get_transcription_status(self, job_id: str) -> TranscriptionResult:
         """Get current status of transcription job"""
         if job_id not in self.jobs:

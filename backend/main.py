@@ -85,31 +85,17 @@ async def get_transcription_status(job_id: str):
 async def download_transcription(job_id: str, format: OutputFormat):
     """Download transcription in specified format"""
     try:
-        # Get transcription result
+        # Check if transcription is completed first
         result = await transcription_service.get_transcription_status(job_id)
-        
+
         if result.status != TranscriptionStatus.COMPLETED:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Transcription not completed. Status: {result.status}"
             )
-        
-        if not result.text and not result.segments:
-            raise HTTPException(status_code=404, detail="No transcription data available")
-        
-        # Convert to requested format
-        if format == OutputFormat.SRT:
-            if not result.segments:
-                raise HTTPException(status_code=400, detail="Segments not available for SRT format")
-            content = format_converter.to_srt(result.segments)
-        elif format == OutputFormat.VTT:
-            if not result.segments:
-                raise HTTPException(status_code=400, detail="Segments not available for VTT format")
-            content = format_converter.to_vtt(result.segments)
-        elif format == OutputFormat.TXT:
-            content = format_converter.to_txt(result.text, result.segments)
-        else:
-            raise HTTPException(status_code=400, detail="Invalid format")
+
+        # Use AssemblyAI's built-in subtitle export functionality
+        content = await transcription_service.get_subtitle_export(job_id, format.value)
         
         # Get job info for filename
         job_info = transcription_service.get_job_info(job_id)
