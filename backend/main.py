@@ -120,12 +120,15 @@ async def download_transcription(job_id: str, format: OutputFormat):
         extension = format_converter.get_file_extension(format)
         download_filename = f"{base_filename}_transcription{extension}"
         
-        # Return file content
+        # Return file content with proper UTF-8 encoding
         content_type = format_converter.get_content_type(format)
-        
+
+        # Encode content as UTF-8 bytes to handle Unicode characters
+        content_bytes = content.encode('utf-8')
+
         return Response(
-            content=content,
-            media_type=content_type,
+            content=content_bytes,
+            media_type=f"{content_type}; charset=utf-8",
             headers={
                 "Content-Disposition": f"attachment; filename={download_filename}"
             }
