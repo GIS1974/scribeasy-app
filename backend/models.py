@@ -29,6 +29,7 @@ class SubtitleSegment(BaseModel):
     start: float
     end: float
     text: str
+    speaker: Optional[str] = None  # Speaker label (A, B, C, etc.)
 
 class TranscriptionResult(BaseModel):
     job_id: str

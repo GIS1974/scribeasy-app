@@ -46,6 +46,23 @@ async def root():
     """Health check endpoint"""
     return {"message": "ScribeEasy API is running", "version": "1.0.0"}
 
+@app.get("/test-download")
+async def test_download():
+    """Test endpoint for download functionality"""
+    test_content = "What is your problem? You are my problem. What, you want to go before? Aren't they fighting? Oh, they're not fighting. They're discussing. I'm a child of a divorced dad. I know they are. You're a selfish, hateful person."
+
+    # Test UTF-8 encoding
+    content_bytes = test_content.encode('utf-8')
+
+    return Response(
+        content=content_bytes,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="test_transcription.txt"',
+            "Content-Type": "text/plain; charset=utf-8"
+        }
+    )
+
 @app.post("/upload", response_model=UploadResponse)
 async def upload_file(
     background_tasks: BackgroundTasks,

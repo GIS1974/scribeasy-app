@@ -13,7 +13,7 @@ class Settings:
     ALLOWED_EXTENSIONS: set = {".mp3", ".mp4", ".mkv", ".wav", ".m4a"}
     
     # CORS Configuration
-    CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+    CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:3000").split(",")
     
     # API Configuration
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")

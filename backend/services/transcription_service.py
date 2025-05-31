@@ -23,7 +23,7 @@ class TranscriptionService:
                 punctuate=True,
                 format_text=True,
                 dual_channel=False,
-                speaker_labels=False,  # Can be enabled if needed
+                speaker_labels=True,  # Enable speaker diarization for better segmentation
                 auto_highlights=False,
                 content_safety=False,
                 iab_categories=False,
@@ -67,40 +67,33 @@ class TranscriptionService:
             raise Exception(f"Failed to start transcription: {str(e)}")
     
     async def get_subtitle_export(self, job_id: str, format_type: str) -> str:
-        """Get subtitle export in specified format using AssemblyAI's export functionality"""
+        """Get subtitle export in specified format using our improved segmentation"""
         print(f"DEBUG: get_subtitle_export called with job_id={job_id}, format_type={format_type}")
 
         if job_id not in self.jobs:
             raise Exception("Job not found")
 
-        job_info = self.jobs[job_id]
-        transcript = job_info["transcript"]
+        # Get the transcription result with our improved segments
+        result = await self.get_transcription_status(job_id)
+
+        if result.status != TranscriptionStatus.COMPLETED:
+            raise Exception(f"Transcription not completed. Status: {result.status}")
+
+        if not result.segments:
+            raise Exception("No segments available for export")
 
         try:
-            loop = asyncio.get_event_loop()
-
-            # Get the latest transcript data first
-            current_transcript = await loop.run_in_executor(
-                self.executor,
-                lambda: aai.Transcript.get_by_id(transcript.id)
-            )
+            from utils.format_converter import format_converter
 
             if format_type.lower() == 'srt':
-                print("DEBUG: Exporting SRT using AssemblyAI export_subtitles_srt()")
-                subtitle_content = await loop.run_in_executor(
-                    self.executor,
-                    lambda: current_transcript.export_subtitles_srt()
-                )
+                print("DEBUG: Exporting SRT using improved segmentation")
+                subtitle_content = format_converter.to_srt(result.segments)
             elif format_type.lower() == 'vtt':
-                print("DEBUG: Exporting VTT using AssemblyAI export_subtitles_vtt()")
-                subtitle_content = await loop.run_in_executor(
-                    self.executor,
-                    lambda: current_transcript.export_subtitles_vtt()
-                )
+                print("DEBUG: Exporting VTT using improved segmentation")
+                subtitle_content = format_converter.to_vtt(result.segments)
             else:
-                print("DEBUG: Exporting TXT using transcript text")
-                # For TXT, get the full transcript text
-                subtitle_content = current_transcript.text or ""
+                print("DEBUG: Exporting TXT using improved segmentation")
+                subtitle_content = format_converter.to_txt(result.text, result.segments)
 
             print(f"DEBUG: Export successful, content length: {len(subtitle_content)}")
             return subtitle_content
@@ -108,6 +101,156 @@ class TranscriptionService:
         except Exception as e:
             print(f"DEBUG: Export failed with error: {str(e)}")
             raise Exception(f"Error exporting subtitles: {str(e)}")
+
+    def _create_segments_from_utterances(self, utterances) -> list:
+        """Create segments from AssemblyAI utterances with speaker-based segmentation"""
+        segments = []
+
+        for utterance in utterances:
+            # Convert utterance to segments, splitting on sentence boundaries if needed
+            utterance_segments = self._split_utterance_by_sentences(
+                text=utterance.text,
+                start_time=utterance.start / 1000.0,  # Convert to seconds
+                end_time=utterance.end / 1000.0,
+                speaker=utterance.speaker,
+                words=utterance.words if hasattr(utterance, 'words') else None
+            )
+            segments.extend(utterance_segments)
+
+        return segments
+
+    def _create_segments_from_words(self, words) -> list:
+        """Fallback method to create segments from words when utterances are not available"""
+        segments = []
+        current_segment = []
+        segment_start = None
+        current_speaker = None
+
+        for word in words:
+            word_speaker = getattr(word, 'speaker', None)
+
+            if segment_start is None:
+                segment_start = word.start / 1000.0
+                current_speaker = word_speaker
+
+            # Check if we should start a new segment
+            should_split = False
+
+            # Split on speaker change
+            if word_speaker and current_speaker and word_speaker != current_speaker:
+                should_split = True
+
+            # Split on sentence boundaries
+            elif word.text.endswith(('.', '!', '?')):
+                should_split = True
+
+            # Split if segment is too long (max 5 seconds)
+            elif (word.end / 1000.0 - segment_start) > 5.0:
+                should_split = True
+
+            current_segment.append(word.text)
+
+            if should_split:
+                segments.append(SubtitleSegment(
+                    start=segment_start,
+                    end=word.end / 1000.0,
+                    text=' '.join(current_segment).strip(),
+                    speaker=current_speaker
+                ))
+                current_segment = []
+                segment_start = None
+                current_speaker = word_speaker
+
+        # Add remaining words as final segment
+        if current_segment and segment_start is not None:
+            last_word = words[-1]
+            segments.append(SubtitleSegment(
+                start=segment_start,
+                end=last_word.end / 1000.0,
+                text=' '.join(current_segment).strip(),
+                speaker=current_speaker
+            ))
+
+        return segments
+
+    def _split_utterance_by_sentences(self, text: str, start_time: float, end_time: float,
+                                     speaker: str, words=None) -> list:
+        """Split an utterance into segments based on sentence boundaries"""
+        import re
+
+        segments = []
+
+        # If the utterance is short or doesn't contain sentence endings, return as single segment
+        if len(text) < 100 or not re.search(r'[.!?]', text):
+            return [SubtitleSegment(
+                start=start_time,
+                end=end_time,
+                text=text.strip(),
+                speaker=speaker
+            )]
+
+        # Split text into sentences while preserving punctuation
+        sentence_pattern = r'([.!?]+)'
+        parts = re.split(sentence_pattern, text)
+
+        sentences = []
+        current_sentence = ""
+
+        for i, part in enumerate(parts):
+            if re.match(sentence_pattern, part):
+                # This is punctuation, add it to current sentence
+                current_sentence += part
+                sentences.append(current_sentence.strip())
+                current_sentence = ""
+            else:
+                # This is text
+                current_sentence += part
+
+        # Add any remaining text as the last sentence
+        if current_sentence.strip():
+            sentences.append(current_sentence.strip())
+
+        # Remove empty sentences
+        sentences = [s for s in sentences if s.strip()]
+
+        if len(sentences) <= 1:
+            # If we only have one sentence, return as single segment
+            return [SubtitleSegment(
+                start=start_time,
+                end=end_time,
+                text=text.strip(),
+                speaker=speaker
+            )]
+
+        # Calculate timing for each sentence based on character count
+        total_chars = len(text)
+        current_time = start_time
+        duration = end_time - start_time
+
+        for i, sentence in enumerate(sentences):
+            sentence_chars = len(sentence)
+            sentence_duration = (sentence_chars / total_chars) * duration
+
+            # Ensure minimum segment duration of 0.5 seconds
+            if sentence_duration < 0.5:
+                sentence_duration = 0.5
+
+            segment_end = min(current_time + sentence_duration, end_time)
+
+            # For the last sentence, make sure it ends at the utterance end time
+            if i == len(sentences) - 1:
+                segment_end = end_time
+
+            segments.append(SubtitleSegment(
+                start=current_time,
+                end=segment_end,
+                text=sentence.strip(),
+                speaker=speaker
+            ))
+
+            current_time = segment_end
+
+        return segments
 
     async def get_transcription_status(self, job_id: str) -> TranscriptionResult:
         """Get current status of transcription job"""
@@ -118,51 +261,33 @@ class TranscriptionService:
         transcript = job_info["transcript"]
         
         try:
-            # Poll transcript status
+            # Poll transcript status with timeout
             loop = asyncio.get_event_loop()
-            current_transcript = await loop.run_in_executor(
-                self.executor,
-                lambda: aai.Transcript.get_by_id(transcript.id)
-            )
+            try:
+                current_transcript = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        self.executor,
+                        lambda: aai.Transcript.get_by_id(transcript.id)
+                    ),
+                    timeout=30.0  # 30 second timeout
+                )
+            except asyncio.TimeoutError:
+                raise Exception("Timeout while checking transcription status")
 
             # Update job status - check for the correct status enum values
             if current_transcript.status == "completed":
                 job_info["status"] = TranscriptionStatus.COMPLETED
                 job_info["completed_at"] = time.time()
 
-                # Convert segments to our format
+                # Convert segments to our format using improved segmentation logic
                 segments = []
-                if current_transcript.words:
-                    # Group words into segments (sentences or by time intervals)
-                    current_segment = []
-                    segment_start = None
 
-                    for word in current_transcript.words:
-                        if segment_start is None:
-                            segment_start = word.start / 1000.0  # Convert to seconds
-
-                        current_segment.append(word.text)
-
-                        # End segment on sentence boundaries or after 5 seconds
-                        if (word.text.endswith(('.', '!', '?')) or
-                            (word.end / 1000.0 - segment_start) > 5.0):
-
-                            segments.append(SubtitleSegment(
-                                start=segment_start,
-                                end=word.end / 1000.0,
-                                text=' '.join(current_segment).strip()
-                            ))
-                            current_segment = []
-                            segment_start = None
-
-                    # Add remaining words as final segment
-                    if current_segment and segment_start is not None:
-                        last_word = current_transcript.words[-1]
-                        segments.append(SubtitleSegment(
-                            start=segment_start,
-                            end=last_word.end / 1000.0,
-                            text=' '.join(current_segment).strip()
-                        ))
+                if current_transcript.utterances:
+                    # Use utterances for speaker-based segmentation
+                    segments = self._create_segments_from_utterances(current_transcript.utterances)
+                elif current_transcript.words:
+                    # Fallback to word-based segmentation if no utterances available
+                    segments = self._create_segments_from_words(current_transcript.words)
 
                 return TranscriptionResult(
                     job_id=job_id,

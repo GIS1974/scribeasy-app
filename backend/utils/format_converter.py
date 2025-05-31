@@ -5,45 +5,61 @@ import re
 class FormatConverter:
     @staticmethod
     def to_srt(segments: List[SubtitleSegment]) -> str:
-        """Convert segments to SRT format"""
+        """Convert segments to SRT format with speaker labels"""
         srt_content = []
-        
+
         for i, segment in enumerate(segments, 1):
             start_time = FormatConverter._seconds_to_srt_time(segment.start)
             end_time = FormatConverter._seconds_to_srt_time(segment.end)
-            
+
+            # Format text with speaker label if available
+            text = segment.text
+            if segment.speaker:
+                text = f"[{segment.speaker}] {text}"
+
             srt_content.append(f"{i}")
             srt_content.append(f"{start_time} --> {end_time}")
-            srt_content.append(segment.text)
+            srt_content.append(text)
             srt_content.append("")  # Empty line between segments
-        
+
         return "\n".join(srt_content)
     
     @staticmethod
     def to_vtt(segments: List[SubtitleSegment]) -> str:
-        """Convert segments to WebVTT format"""
+        """Convert segments to WebVTT format with speaker labels"""
         vtt_content = ["WEBVTT", ""]
-        
+
         for segment in segments:
             start_time = FormatConverter._seconds_to_vtt_time(segment.start)
             end_time = FormatConverter._seconds_to_vtt_time(segment.end)
-            
+
+            # Format text with speaker label if available
+            text = segment.text
+            if segment.speaker:
+                text = f"<v {segment.speaker}>{text}"
+
             vtt_content.append(f"{start_time} --> {end_time}")
-            vtt_content.append(segment.text)
+            vtt_content.append(text)
             vtt_content.append("")  # Empty line between segments
-        
+
         return "\n".join(vtt_content)
     
     @staticmethod
     def to_txt(text: str, segments: List[SubtitleSegment] = None) -> str:
-        """Convert to plain text format"""
+        """Convert to plain text format with speaker labels"""
         if text:
             # Clean up the text
             cleaned_text = re.sub(r'\s+', ' ', text.strip())
             return cleaned_text
         elif segments:
-            # Fallback to segments if no full text available
-            return "\n".join(segment.text for segment in segments)
+            # Fallback to segments if no full text available, include speaker labels
+            lines = []
+            for segment in segments:
+                if segment.speaker:
+                    lines.append(f"[{segment.speaker}] {segment.text}")
+                else:
+                    lines.append(segment.text)
+            return "\n".join(lines)
         else:
             return ""
     
