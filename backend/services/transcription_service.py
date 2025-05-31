@@ -79,25 +79,27 @@ class TranscriptionService:
         try:
             loop = asyncio.get_event_loop()
 
+            # Get the latest transcript data first
+            current_transcript = await loop.run_in_executor(
+                self.executor,
+                lambda: aai.Transcript.get_by_id(transcript.id)
+            )
+
             if format_type.lower() == 'srt':
                 print("DEBUG: Exporting SRT using AssemblyAI export_subtitles_srt()")
                 subtitle_content = await loop.run_in_executor(
                     self.executor,
-                    lambda: transcript.export_subtitles_srt()
+                    lambda: current_transcript.export_subtitles_srt()
                 )
             elif format_type.lower() == 'vtt':
                 print("DEBUG: Exporting VTT using AssemblyAI export_subtitles_vtt()")
                 subtitle_content = await loop.run_in_executor(
                     self.executor,
-                    lambda: transcript.export_subtitles_vtt()
+                    lambda: current_transcript.export_subtitles_vtt()
                 )
             else:
                 print("DEBUG: Exporting TXT using transcript text")
                 # For TXT, get the full transcript text
-                current_transcript = await loop.run_in_executor(
-                    self.executor,
-                    lambda: aai.Transcript.get_by_id(transcript.id)
-                )
                 subtitle_content = current_transcript.text or ""
 
             print(f"DEBUG: Export successful, content length: {len(subtitle_content)}")
@@ -122,29 +124,29 @@ class TranscriptionService:
                 self.executor,
                 lambda: aai.Transcript.get_by_id(transcript.id)
             )
-            
-            # Update job status
-            if current_transcript.status == aai.TranscriptStatus.completed:
+
+            # Update job status - check for the correct status enum values
+            if current_transcript.status == "completed":
                 job_info["status"] = TranscriptionStatus.COMPLETED
                 job_info["completed_at"] = time.time()
-                
+
                 # Convert segments to our format
                 segments = []
                 if current_transcript.words:
                     # Group words into segments (sentences or by time intervals)
                     current_segment = []
                     segment_start = None
-                    
+
                     for word in current_transcript.words:
                         if segment_start is None:
                             segment_start = word.start / 1000.0  # Convert to seconds
-                        
+
                         current_segment.append(word.text)
-                        
+
                         # End segment on sentence boundaries or after 5 seconds
-                        if (word.text.endswith(('.', '!', '?')) or 
+                        if (word.text.endswith(('.', '!', '?')) or
                             (word.end / 1000.0 - segment_start) > 5.0):
-                            
+
                             segments.append(SubtitleSegment(
                                 start=segment_start,
                                 end=word.end / 1000.0,
@@ -152,7 +154,7 @@ class TranscriptionService:
                             ))
                             current_segment = []
                             segment_start = None
-                    
+
                     # Add remaining words as final segment
                     if current_segment and segment_start is not None:
                         last_word = current_transcript.words[-1]
@@ -161,7 +163,7 @@ class TranscriptionService:
                             end=last_word.end / 1000.0,
                             text=' '.join(current_segment).strip()
                         ))
-                
+
                 return TranscriptionResult(
                     job_id=job_id,
                     status=TranscriptionStatus.COMPLETED,
@@ -170,23 +172,23 @@ class TranscriptionService:
                     confidence=current_transcript.confidence,
                     audio_duration=current_transcript.audio_duration / 1000.0 if current_transcript.audio_duration else None
                 )
-                
-            elif current_transcript.status == aai.TranscriptStatus.error:
+
+            elif current_transcript.status == "error":
                 job_info["status"] = TranscriptionStatus.ERROR
                 return TranscriptionResult(
                     job_id=job_id,
                     status=TranscriptionStatus.ERROR,
                     error=current_transcript.error or "Unknown error occurred"
                 )
-                
+
             else:
-                # Still processing
+                # Still processing (queued, processing, etc.)
                 job_info["status"] = TranscriptionStatus.PROCESSING
                 return TranscriptionResult(
                     job_id=job_id,
                     status=TranscriptionStatus.PROCESSING
                 )
-                
+
         except Exception as e:
             job_info["status"] = TranscriptionStatus.ERROR
             return TranscriptionResult(

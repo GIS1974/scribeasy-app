@@ -96,31 +96,37 @@ async def download_transcription(job_id: str, format: OutputFormat):
 
         # Use AssemblyAI's built-in subtitle export functionality
         content = await transcription_service.get_subtitle_export(job_id, format.value)
-        
+
         # Get job info for filename
         job_info = transcription_service.get_job_info(job_id)
         original_filename = job_info.get("filename", "transcription") if job_info else "transcription"
         base_filename = Path(original_filename).stem
-        
+
         # Create download filename
         extension = format_converter.get_file_extension(format)
         download_filename = f"{base_filename}_transcription{extension}"
-        
+
         # Return file content with proper UTF-8 encoding
         content_type = format_converter.get_content_type(format)
 
+        # Ensure content is properly encoded as UTF-8 bytes
+        if isinstance(content, str):
+            content_bytes = content.encode('utf-8')
+        else:
+            content_bytes = content
+
         # Create response with explicit UTF-8 encoding
         headers = {
-            "Content-Disposition": f"attachment; filename={download_filename}",
+            "Content-Disposition": f"attachment; filename=\"{download_filename}\"",
             "Content-Type": f"{content_type}; charset=utf-8"
         }
 
         return Response(
-            content=content.encode('utf-8'),
+            content=content_bytes,
             media_type=f"{content_type}; charset=utf-8",
             headers=headers
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
