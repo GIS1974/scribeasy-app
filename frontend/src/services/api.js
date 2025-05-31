@@ -55,7 +55,7 @@ export const apiService = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 180000, // 3 minutes for upload
+      timeout: 300000, // 5 minutes for upload and initial processing
       onUploadProgress: onUploadProgress ? (progressEvent) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
         onUploadProgress(percentCompleted)

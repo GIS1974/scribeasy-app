@@ -16,6 +16,12 @@ class TranscriptionService:
     async def start_transcription(self, file_path: str, filename: str) -> str:
         """Start transcription job with AssemblyAI"""
         try:
+            print(f"DEBUG: Starting transcription for {filename}")
+            print(f"DEBUG: File path: {file_path}")
+            print(f"DEBUG: API key configured: {bool(settings.ASSEMBLYAI_API_KEY)}")
+
+            # Skip API test and proceed directly to transcription submission
+            print("DEBUG: Proceeding with transcription submission...")
             # Configure transcription settings for highest accuracy using slam-1 model
             config = aai.TranscriptionConfig(
                 speech_model=aai.SpeechModel.slam_1,  # Highest accuracy model for English
@@ -43,12 +49,23 @@ class TranscriptionService:
                 webhook_auth_header_value=None,
             )
             
-            # Submit transcription job
+            # Submit transcription job with timeout
+            print(f"DEBUG: Submitting transcription job for file: {file_path}")
             loop = asyncio.get_event_loop()
-            transcript = await loop.run_in_executor(
-                self.executor,
-                lambda: self.client.submit(file_path, config=config)
-            )
+            try:
+                transcript = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        self.executor,
+                        lambda: self.client.submit(file_path, config=config)
+                    ),
+                    timeout=120.0  # 2 minute timeout for submission
+                )
+                print(f"DEBUG: Transcription job submitted successfully, ID: {transcript.id}")
+            except asyncio.TimeoutError:
+                raise Exception("Timeout while submitting transcription job to AssemblyAI")
+            except Exception as e:
+                print(f"DEBUG: Error submitting transcription job: {str(e)}")
+                raise
             
             job_id = transcript.id
             

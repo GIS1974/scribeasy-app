@@ -70,24 +70,33 @@ async def upload_file(
 ):
     """Upload file and start transcription"""
     try:
+        print(f"DEBUG: Upload started for file: {file.filename}, size: {file.size if hasattr(file, 'size') else 'unknown'}")
+
         # Save uploaded file
+        print("DEBUG: Saving uploaded file...")
         file_path = await file_service.save_upload_file(file)
-        
+        print(f"DEBUG: File saved to: {file_path}")
+
         # Start transcription
+        print("DEBUG: Starting transcription...")
         job_id = await transcription_service.start_transcription(file_path, file.filename)
-        
+        print(f"DEBUG: Transcription started with job_id: {job_id}")
+
         # Schedule file cleanup after processing
         background_tasks.add_task(cleanup_after_processing, job_id, file_path)
-        
+
         return UploadResponse(
             job_id=job_id,
             message="File uploaded successfully. Transcription started.",
             filename=file.filename
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
+        print(f"ERROR: Upload failed: {str(e)}")
+        import traceback
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/status/{job_id}", response_model=TranscriptionResult)
