@@ -6,6 +6,7 @@ import fileValidation from '../utils/fileValidation'
 const FileUpload = ({ onUploadSuccess, onError }) => {
   const [selectedFile, setSelectedFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -56,14 +57,18 @@ const FileUpload = ({ onUploadSuccess, onError }) => {
     }
 
     setIsUploading(true)
-    
+    setUploadProgress(0)
+
     try {
-      const response = await apiService.uploadFile(selectedFile)
+      const response = await apiService.uploadFile(selectedFile, (progress) => {
+        setUploadProgress(progress)
+      })
       onUploadSuccess(response)
     } catch (error) {
       onError(error.message || 'Upload failed. Please try again.')
     } finally {
       setIsUploading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -144,7 +149,7 @@ const FileUpload = ({ onUploadSuccess, onError }) => {
             {isUploading ? (
               <>
                 <div className="spinner"></div>
-                Uploading...
+                Uploading... {uploadProgress}%
               </>
             ) : (
               <>

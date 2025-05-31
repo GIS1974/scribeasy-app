@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 seconds
+  timeout: 120000, // 2 minutes for better upload handling
 })
 
 // Request interceptor for logging
@@ -47,17 +47,21 @@ api.interceptors.response.use(
 
 export const apiService = {
   // Upload file and start transcription
-  async uploadFile(file) {
+  async uploadFile(file, onUploadProgress = null) {
     const formData = new FormData()
     formData.append('file', file)
-    
+
     const response = await api.post('/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 60000, // 1 minute for upload
+      timeout: 180000, // 3 minutes for upload
+      onUploadProgress: onUploadProgress ? (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        onUploadProgress(percentCompleted)
+      } : undefined,
     })
-    
+
     return response.data
   },
 

@@ -79,7 +79,7 @@ class TranscriptionService:
             loop = asyncio.get_event_loop()
             current_transcript = await loop.run_in_executor(
                 self.executor,
-                lambda: self.client.get_by_id(transcript.id)
+                lambda: aai.Transcript.get_by_id(transcript.id)
             )
             
             # Update job status
