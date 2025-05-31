@@ -1,7 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response
 import asyncio
+import re
 from pathlib import Path
 
 from config import settings
@@ -95,16 +96,24 @@ async def download_transcription(job_id: str, format: OutputFormat):
             )
 
         # Use AssemblyAI's built-in subtitle export functionality
-        content = await transcription_service.get_subtitle_export(job_id, format.value)
+        try:
+            content = await transcription_service.get_subtitle_export(job_id, format.value)
+            print(f"DEBUG: Successfully got content from transcription service")
+        except Exception as e:
+            print(f"ERROR: Failed to get content from transcription service: {e}")
+            raise
 
         # Get job info for filename
         job_info = transcription_service.get_job_info(job_id)
         original_filename = job_info.get("filename", "transcription") if job_info else "transcription"
         base_filename = Path(original_filename).stem
 
+        # Sanitize filename to avoid issues with special characters
+        safe_filename = re.sub(r'[^\w\-_\.]', '_', base_filename)
+
         # Create download filename
         extension = format_converter.get_file_extension(format)
-        download_filename = f"{base_filename}_transcription{extension}"
+        download_filename = f"{safe_filename}_transcription{extension}"
 
         # Return file content with proper UTF-8 encoding
         content_type = format_converter.get_content_type(format)
@@ -114,19 +123,24 @@ async def download_transcription(job_id: str, format: OutputFormat):
             "Content-Disposition": f"attachment; filename=\"{download_filename}\"",
         }
 
-        # Use StreamingResponse to avoid encoding issues
-        def generate_content():
-            # Ensure content is UTF-8 encoded
+        # Create response with proper UTF-8 handling
+        try:
+            # Ensure content is properly encoded as UTF-8 bytes
             if isinstance(content, str):
-                yield content.encode('utf-8')
+                content_bytes = content.encode('utf-8')
             else:
-                yield content
+                content_bytes = content
 
-        return StreamingResponse(
-            generate_content(),
-            media_type=f"{content_type}; charset=utf-8",
-            headers=headers
-        )
+            return Response(
+                content=content_bytes,
+                media_type=f"{content_type}; charset=utf-8",
+                headers=headers
+            )
+        except Exception as e:
+            print(f"ERROR: Failed to create response: {e}")
+            import traceback
+            print(f"ERROR: Traceback: {traceback.format_exc()}")
+            raise
 
     except HTTPException:
         raise
