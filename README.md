@@ -68,7 +68,7 @@ Create `.env` file in backend directory:
 ```
 ASSEMBLYAI_API_KEY=your_api_key_here
 UPLOAD_DIR=./temp_uploads
-MAX_FILE_SIZE=100000000  # 100MB
+MAX_FILE_SIZE=1000000000  # 1000MB
 ```
 
 Start the backend:

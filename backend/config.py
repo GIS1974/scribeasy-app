@@ -9,7 +9,7 @@ class Settings:
     
     # File Upload Configuration
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./temp_uploads")
-    MAX_FILE_SIZE: int = int(os.getenv("MAX_FILE_SIZE", "100000000"))  # 100MB default
+    MAX_FILE_SIZE: int = int(os.getenv("MAX_FILE_SIZE", "1000000000"))  # 1000MB default
     ALLOWED_EXTENSIONS: set = {".mp3", ".mp4", ".mkv", ".wav", ".m4a"}
     
     # CORS Configuration

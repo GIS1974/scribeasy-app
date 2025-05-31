@@ -7,8 +7,8 @@ export const SUPPORTED_FILE_TYPES = {
   '.m4a': ['audio/mp4', 'audio/m4a']
 }
 
-// Maximum file size (100MB)
-export const MAX_FILE_SIZE = 100 * 1024 * 1024
+// Maximum file size (1000MB)
+export const MAX_FILE_SIZE = 1000 * 1024 * 1024
 
 export const fileValidation = {
   /**

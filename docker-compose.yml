@@ -10,7 +10,7 @@ services:
     environment:
       - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
       - UPLOAD_DIR=/app/temp_uploads
-      - MAX_FILE_SIZE=100000000
+      - MAX_FILE_SIZE=1000000000
       - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
       - API_HOST=0.0.0.0
       - API_PORT=8000
