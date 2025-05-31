@@ -55,14 +55,35 @@ git clone <repository-url>
 cd scribeasy-app
 ```
 
-### 2. Backend Setup
+### 2. Install Dependencies
 
+Install all dependencies at once:
+```bash
+npm run install:all
+```
+
+Or install manually:
+
+**Backend:**
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+```
+
+**Root (for development scripts):**
+```bash
+npm install
+```
+
+### 3. Configure Environment
 
 Create `.env` file in backend directory:
 ```
@@ -71,23 +92,24 @@ UPLOAD_DIR=./temp_uploads
 MAX_FILE_SIZE=1000000000  # 1000MB
 ```
 
-Start the backend:
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+### 4. Start Development Servers
 
-### 3. Frontend Setup
-
+**Option 1: NPM Script (Recommended)**
 ```bash
-cd frontend
-npm install
 npm run dev
 ```
+
+**Option 2: Platform-specific scripts**
+- Windows: Double-click `dev.bat` or run in command prompt
+- Unix/Linux/macOS: `./dev.sh`
+- Cross-platform: `node dev.js`
 
 The application will be available at:
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
+
+> 📝 See [DEV_SCRIPTS.md](DEV_SCRIPTS.md) for detailed information about development scripts.
 
 ## Usage
 

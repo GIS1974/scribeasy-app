@@ -1,0 +1,29 @@
+{
+  "name": "scribeasy-app",
+  "version": "1.0.0",
+  "description": "Audio/Video Transcription App using AssemblyAI",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && pip install -r requirements.txt",
+    "install:frontend": "cd frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "transcription",
+    "assemblyai",
+    "react",
+    "fastapi",
+    "audio",
+    "video"
+  ],
+  "author": "",
+  "license": "MIT"
+}
