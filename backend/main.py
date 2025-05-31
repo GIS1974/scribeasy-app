@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 import asyncio
 from pathlib import Path
 
@@ -109,20 +109,21 @@ async def download_transcription(job_id: str, format: OutputFormat):
         # Return file content with proper UTF-8 encoding
         content_type = format_converter.get_content_type(format)
 
-        # Ensure content is properly encoded as UTF-8 bytes
-        if isinstance(content, str):
-            content_bytes = content.encode('utf-8')
-        else:
-            content_bytes = content
-
-        # Create response with explicit UTF-8 encoding
+        # Create response with proper UTF-8 handling
         headers = {
             "Content-Disposition": f"attachment; filename=\"{download_filename}\"",
-            "Content-Type": f"{content_type}; charset=utf-8"
         }
 
-        return Response(
-            content=content_bytes,
+        # Use StreamingResponse to avoid encoding issues
+        def generate_content():
+            # Ensure content is UTF-8 encoded
+            if isinstance(content, str):
+                yield content.encode('utf-8')
+            else:
+                yield content
+
+        return StreamingResponse(
+            generate_content(),
             media_type=f"{content_type}; charset=utf-8",
             headers=headers
         )
@@ -131,6 +132,7 @@ async def download_transcription(job_id: str, format: OutputFormat):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+
 
 @app.get("/preview/{job_id}")
 async def get_preview(job_id: str, lines: int = 10):
