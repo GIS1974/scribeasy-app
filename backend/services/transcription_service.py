@@ -18,8 +18,8 @@ class TranscriptionService:
         try:
             # Configure transcription settings for highest accuracy using slam-1 model
             config = aai.TranscriptionConfig(
-                speech_model="slam-1",  # Highest accuracy model for English
-                language_detection=True,
+                speech_model=aai.SpeechModel.slam_1,  # Highest accuracy model for English
+                # Note: slam-1 is English-only, so language_detection is not compatible
                 punctuate=True,
                 format_text=True,
                 dual_channel=False,
