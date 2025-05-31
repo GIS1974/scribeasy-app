@@ -16,9 +16,9 @@ class TranscriptionService:
     async def start_transcription(self, file_path: str, filename: str) -> str:
         """Start transcription job with AssemblyAI"""
         try:
-            # Configure transcription settings for best quality
+            # Configure transcription settings for highest accuracy using slam-1 model
             config = aai.TranscriptionConfig(
-                speech_model=aai.SpeechModel.best,  # Use the best available model
+                speech_model="slam-1",  # Highest accuracy model for English
                 language_detection=True,
                 punctuate=True,
                 format_text=True,

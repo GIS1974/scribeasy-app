@@ -5,7 +5,7 @@ A modern web application that enables users to upload audio or video files, tran
 ## Features
 
 - 🎵 Support for multiple file formats (.mp4, .mkv, .mp3)
-- 🤖 High-quality transcription using AssemblyAI's latest models
+- 🤖 High-quality transcription using AssemblyAI's slam-1 model (highest accuracy for English)
 - 📝 Multiple output formats (SRT, VTT, TXT)
 - 👀 Subtitle preview functionality
 - 🔒 Privacy-focused (no permanent file storage)
